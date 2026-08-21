@@ -1,0 +1,5 @@
+node_modules/
+tools/sheet.html
+.DS_Store
+Thumbs.db
+*.log

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dance Break</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<main class="wrap">
+
+  <!-- ======================= HOME ======================= -->
+  <section id="screen-home" class="screen">
+    <header class="topbar">
+      <div class="brand"><h1>Dance Break</h1><span class="dot" aria-hidden="true">&bull;</span></div>
+      <button id="open-cupboard" class="btn-quiet">Cupboard <span id="cupboard-count" class="pill">0</span></button>
+    </header>
+
+    <p class="lede">One move, one beat, beside your desk.</p>
+
+    <button id="dance-now" class="btn-primary btn-big">Dance now</button>
+
+    <div class="card">
+      <h2>When</h2>
+      <p class="advice" id="advice">
+        Start with one break a week. Once that one sticks by itself, add another.
+      </p>
+
+      <ul class="entries" id="entries"></ul>
+      <p class="empty" id="entries-empty">No times set. Nothing will interrupt you.</p>
+
+      <div class="adder">
+        <div class="adder-row">
+          <label class="tlabel" for="new-time">Time</label>
+          <input type="time" id="new-time" value="14:00" step="300">
+        </div>
+        <div class="adder-row">
+          <span class="tlabel" id="lbl-days">Days</span>
+          <div class="days" role="group" aria-labelledby="lbl-days" id="day-picker"></div>
+        </div>
+        <div class="adder-actions">
+          <button id="add-entry" class="btn-primary">Add this time</button>
+          <button id="clear-all" class="btn-quiet">Clear all</button>
+        </div>
+        <p class="err" id="add-error" role="alert"></p>
+      </div>
+
+      <div class="switch-row remind-row">
+        <p class="status" id="next-status" role="status">Reminders are off.</p>
+        <button id="toggle-reminders" aria-pressed="false">Turn on</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Styles</h2>
+      <p class="hint">Breaks pick from whatever is ticked. All five moves in a style come round before any repeats.</p>
+      <div class="checks" id="style-checks"></div>
+    </div>
+
+    <div class="card">
+      <div class="field" style="margin-top:0">
+        <span class="label" id="lbl-len">Break length</span>
+        <div class="seg" role="group" aria-labelledby="lbl-len" id="length-seg">
+          <button data-sec="180" aria-pressed="true">3 min</button>
+          <button data-sec="300" aria-pressed="false">5 min</button>
+          <button data-sec="600" aria-pressed="false">10 min</button>
+        </div>
+      </div>
+    </div>
+
+    <p class="fine">
+      Nothing leaves this machine. No account, no analytics &mdash; your times, your styles
+      and your cupboard sit in this browser and nowhere else. The music is generated
+      here as it plays.
+    </p>
+  </section>
+
+  <!-- ======================= BREAK ======================= -->
+  <section id="screen-break" class="screen" hidden>
+    <div class="break-head">
+      <div>
+        <p class="eyebrow" id="break-style">Hip-Hop Groove</p>
+        <h2 id="break-move">Two-Step</h2>
+        <p class="space" id="break-space">One step each way.</p>
+      </div>
+      <button id="continue-btn" class="btn-quiet">Continue &rarr;</button>
+    </div>
+
+    <div class="stage">
+      <svg id="figure" aria-labelledby="figure-desc"></svg>
+
+      <div>
+        <div class="counts" id="counts" aria-hidden="true"></div>
+        <p class="cue idle" id="cue">Press play when you&rsquo;re up.</p>
+        <p id="figure-desc" class="sr-only"></p>
+        <ol class="steps" id="steps"></ol>
+        <p class="note" id="note"></p>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="control-line">
+        <button id="play" class="btn-primary" style="flex:1 1 180px">Play</button>
+        <button id="mute" aria-pressed="false">Mute</button>
+        <button id="another">Another move</button>
+      </div>
+      <div class="control-line">
+        <div class="seg" role="group" aria-label="Speed" id="speed-seg">
+          <button data-rate="0.5" aria-pressed="false">Half speed</button>
+          <button data-rate="0.75" aria-pressed="false">Slower</button>
+          <button data-rate="1" aria-pressed="true">Normal</button>
+        </div>
+        <a class="ref" id="reference" href="#" target="_blank" rel="noopener noreferrer">See it danced &nearr;</a>
+      </div>
+    </div>
+
+    <div class="timebar" aria-hidden="true"><i id="timefill"></i></div>
+    <p class="timelabel" id="timelabel">3:00 left. Stop whenever you like.</p>
+  </section>
+
+  <!-- ======================= REWARD / DONE ======================= -->
+  <section id="screen-done" class="screen done" hidden>
+    <div id="reward-art" class="reward-art" aria-hidden="false"></div>
+    <h2 id="done-title">That&rsquo;s it.</h2>
+    <p id="done-line">Nothing to log.</p>
+    <div class="btn-row">
+      <button id="done-cupboard">Put it in the cupboard</button>
+      <button id="done-more">One more</button>
+      <button id="done-back" class="btn-primary">Back to work</button>
+    </div>
+  </section>
+
+  <!-- ======================= CUPBOARD ======================= -->
+  <section id="screen-cupboard" class="screen" hidden>
+    <header class="topbar">
+      <div class="brand"><h1>Cupboard</h1></div>
+      <button id="cupboard-back" class="btn-quiet">&larr; Back</button>
+    </header>
+
+    <p class="lede" id="cupboard-summary">Nothing in here yet.</p>
+
+    <div class="shelves" id="shelves"></div>
+
+    <div class="card">
+      <h2>How it fills</h2>
+      <p class="hint">
+        A medal for every break you dance for three minutes or more. Every fifth one is
+        a statue instead, holding the move you earned it with. Nothing is ever taken
+        back out.
+      </p>
+      <p class="hint" id="next-reward" style="margin-top:12px"></p>
+    </div>
+  </section>
+
+</main>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
