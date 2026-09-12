@@ -13,15 +13,15 @@
   <!-- ======================= HOME ======================= -->
   <section id="screen-home" class="screen">
     <header class="topbar">
-      <div class="brand"><h1>Dance Break</h1><span class="dot" aria-hidden="true">&bull;</span></div>
-      <button id="open-cupboard" class="btn-quiet">Cupboard <span id="cupboard-count" class="pill">0</span></button>
+      <div class="brand"><span class="mark" aria-hidden="true"></span><h1>Dance Break</h1></div>
+      <button id="open-cupboard" class="btn-ghost">Cupboard <span id="cupboard-count" class="pill">0</span></button>
     </header>
 
-    <p class="lede">One move, one beat, beside your desk.</p>
+    <p class="lede">One move, one video, beside your desk.</p>
 
     <button id="dance-now" class="btn-primary btn-big">Dance now</button>
 
-    <div class="card">
+    <section class="card">
       <h2>When</h2>
       <p class="advice" id="advice">
         Start with one break a week. Once that one sticks by itself, add another.
@@ -41,7 +41,7 @@
         </div>
         <div class="adder-actions">
           <button id="add-entry" class="btn-primary">Add this time</button>
-          <button id="clear-all" class="btn-quiet">Clear all</button>
+          <button id="clear-all" class="btn-ghost">Clear all</button>
         </div>
         <p class="err" id="add-error" role="alert"></p>
       </div>
@@ -50,54 +50,74 @@
         <p class="status" id="next-status" role="status">Reminders are off.</p>
         <button id="toggle-reminders" aria-pressed="false">Turn on</button>
       </div>
-    </div>
+    </section>
 
-    <div class="card">
+    <section class="card">
       <h2>Styles</h2>
       <p class="hint">Breaks pick from whatever is ticked. All five moves in a style come round before any repeats.</p>
       <div class="checks" id="style-checks"></div>
-    </div>
+    </section>
 
-    <div class="card">
-      <div class="field" style="margin-top:0">
-        <span class="label" id="lbl-len">Break length</span>
-        <div class="seg" role="group" aria-labelledby="lbl-len" id="length-seg">
-          <button data-sec="180" aria-pressed="true">3 min</button>
-          <button data-sec="300" aria-pressed="false">5 min</button>
-          <button data-sec="600" aria-pressed="false">10 min</button>
-        </div>
+    <section class="card">
+      <span class="label" id="lbl-len">Break length</span>
+      <div class="seg" role="group" aria-labelledby="lbl-len" id="length-seg">
+        <button data-sec="180" aria-pressed="true">3 min</button>
+        <button data-sec="300" aria-pressed="false">5 min</button>
+        <button data-sec="600" aria-pressed="false">10 min</button>
       </div>
-    </div>
+    </section>
 
     <p class="fine">
-      Nothing leaves this machine. No account, no analytics &mdash; your times, your styles
-      and your cupboard sit in this browser and nowhere else. The music is generated
-      here as it plays.
+      Your times, styles and cupboard stay in this browser. No account, no analytics.
+      The one exception: a break loads its tutorial from YouTube&rsquo;s privacy-enhanced
+      player, so YouTube sees that request.
     </p>
   </section>
 
   <!-- ======================= BREAK ======================= -->
   <section id="screen-break" class="screen" hidden>
-    <div class="break-head">
+    <header class="break-head">
       <div>
         <p class="eyebrow" id="break-style">Hip-Hop Groove</p>
         <h2 id="break-move">Two-Step</h2>
         <p class="space" id="break-space">One step each way.</p>
       </div>
-      <button id="continue-btn" class="btn-quiet">Continue &rarr;</button>
+      <button id="continue-btn" class="btn-ghost">Continue &rarr;</button>
+    </header>
+
+    <div class="seg modes" role="group" aria-label="How to follow along" id="mode-seg">
+      <button data-mode="video" aria-pressed="true">Watch it</button>
+      <button data-mode="count" aria-pressed="false">Count it out</button>
     </div>
 
-    <div class="stage">
-      <svg id="figure" aria-labelledby="figure-desc"></svg>
+    <!-- video pane -->
+    <div id="pane-video" class="pane">
+      <div class="videoframe"><div id="player-mount"></div></div>
+      <p class="credit">
+        <span id="vid-label">&nbsp;</span>
+        <span class="sep" aria-hidden="true">·</span>
+        <span id="vid-channel"></span>
+        <a class="ref" id="vid-link" href="#" target="_blank" rel="noopener noreferrer">Open on YouTube &nearr;</a>
+      </p>
+      <p class="fallback" id="video-fallback" hidden>
+        The video would not load. The counted version below works offline.
+      </p>
+    </div>
 
-      <div>
-        <div class="counts" id="counts" aria-hidden="true"></div>
-        <p class="cue idle" id="cue">Press play when you&rsquo;re up.</p>
-        <p id="figure-desc" class="sr-only"></p>
-        <ol class="steps" id="steps"></ol>
-        <p class="note" id="note"></p>
+    <!-- counted pane -->
+    <div id="pane-count" class="pane" hidden>
+      <div class="stage">
+        <svg id="figure" aria-labelledby="figure-desc"></svg>
+        <div>
+          <div class="counts" id="counts" aria-hidden="true"></div>
+          <p class="cue idle" id="cue">Press play when you&rsquo;re up.</p>
+          <p id="figure-desc" class="sr-only"></p>
+        </div>
       </div>
     </div>
+
+    <ol class="steps" id="steps"></ol>
+    <p class="note" id="note"></p>
 
     <div class="controls">
       <div class="control-line">
@@ -111,7 +131,6 @@
           <button data-rate="0.75" aria-pressed="false">Slower</button>
           <button data-rate="1" aria-pressed="true">Normal</button>
         </div>
-        <a class="ref" id="reference" href="#" target="_blank" rel="noopener noreferrer">See it danced &nearr;</a>
       </div>
     </div>
 
@@ -121,7 +140,7 @@
 
   <!-- ======================= REWARD / DONE ======================= -->
   <section id="screen-done" class="screen done" hidden>
-    <div id="reward-art" class="reward-art" aria-hidden="false"></div>
+    <div id="reward-art" class="reward-art"></div>
     <h2 id="done-title">That&rsquo;s it.</h2>
     <p id="done-line">Nothing to log.</p>
     <div class="btn-row">
@@ -134,23 +153,23 @@
   <!-- ======================= CUPBOARD ======================= -->
   <section id="screen-cupboard" class="screen" hidden>
     <header class="topbar">
-      <div class="brand"><h1>Cupboard</h1></div>
-      <button id="cupboard-back" class="btn-quiet">&larr; Back</button>
+      <div class="brand"><span class="mark" aria-hidden="true"></span><h1>Cupboard</h1></div>
+      <button id="cupboard-back" class="btn-ghost">&larr; Back</button>
     </header>
 
     <p class="lede" id="cupboard-summary">Nothing in here yet.</p>
 
     <div class="shelves" id="shelves"></div>
 
-    <div class="card">
+    <section class="card">
       <h2>How it fills</h2>
       <p class="hint">
         A medal for every break you dance for three minutes or more. Every fifth one is
         a statue instead, holding the move you earned it with. Nothing is ever taken
         back out.
       </p>
-      <p class="hint" id="next-reward" style="margin-top:12px"></p>
-    </div>
+      <p class="hint" id="next-reward"></p>
+    </section>
   </section>
 
 </main>

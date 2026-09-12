@@ -112,23 +112,30 @@ export const STYLES = [
         ],
       },
       {
-        id: 'cross-step',
-        name: 'Cross Step',
-        beats: 4,
-        space: 'One step each way.',
-        cues: ['cross right', 'open', 'cross left', 'open'],
+        // Renamed from an invented "Cross Step": the grapevine is what this actually
+        // is, it is what every teacher calls it, and it is what you can look up.
+        id: 'grapevine',
+        name: 'Grapevine',
+        beats: 8,
+        space: 'Two steps right, two steps back.',
+        cues: ['step right', 'cross behind', 'step right', 'touch',
+               'step left', 'cross behind', 'step left', 'touch'],
         steps: [
-          'Cross your right foot in front of your left.',
-          'Step back out to open.',
-          'Cross your left foot in front of your right.',
-          'Step back out. Arms swing across as you cross.',
+          'Step your right foot out to the right.',
+          'Cross your left foot behind it.',
+          'Step your right foot out again, then touch your left toe beside it.',
+          'Now the whole thing back to the left. It travels sideways.',
         ],
-        note: 'Go slow first. The crossing is the whole trick.',
+        note: 'Travels. Check you have two steps of room before you start.',
         frames: [
-          [0, P({ shift: -6, bob: 5, lean: 6, hip: 6, legR: [-16, 16], legL: [-14, 4], armR: [-24, 50], armL: [-34, 25] })],
-          [1, P({ bob: 8, legR: [12, 12], legL: [-12, 12], armR: [16, 35], armL: [-16, 35] })],
-          [2, P({ shift: 6, bob: 5, lean: -6, hip: -6, legR: [14, 4], legL: [16, 16], armR: [34, 25], armL: [24, 50] })],
-          [3, P({ bob: 8, legR: [12, 12], legL: [-12, 12], armR: [16, 35], armL: [-16, 35] })],
+          [0, P({ shift: -10, bob: 3, hip: -4, legR: [24, 2], legL: [-6, 12], armR: [30, 35], armL: [-22, 45] })],
+          [1, P({ shift: -3, bob: 7, lean: -3, legR: [8, 6], legL: [14, 10], armR: [20, 50], armL: [-14, 55] })],
+          [2, P({ shift: 4, bob: 3, hip: -4, legR: [24, 2], legL: [-6, 12], armR: [32, 32], armL: [-20, 48] })],
+          [3, P({ shift: 11, bob: 6, legR: [10, 4], legL: [2, 16], armR: [24, 45], armL: [-24, 45] })],
+          [4, P({ shift: 4, bob: 3, hip: 4, legL: [-24, 2], legR: [6, 12], armL: [-30, 35], armR: [22, 45] })],
+          [5, P({ shift: -3, bob: 7, lean: 3, legL: [-8, 6], legR: [-14, 10], armL: [-20, 50], armR: [14, 55] })],
+          [6, P({ shift: -10, bob: 3, hip: 4, legL: [-24, 2], legR: [6, 12], armL: [-32, 32], armR: [20, 48] })],
+          [7, P({ shift: -13, bob: 6, legL: [-10, 4], legR: [-2, 16], armL: [-24, 45], armR: [24, 45] })],
         ],
       },
     ],
@@ -363,9 +370,5 @@ export function findMove(id) {
   return ALL_MOVES.find((m) => m.id === id) || ALL_MOVES[0];
 }
 
-// Opens a YouTube search, never a specific video ID. A search URL cannot rot;
-// a hardcoded video ID can, and I will not ship one I have not verified.
-export function referenceSearchUrl(move) {
-  const q = move.styleName + ' ' + move.name + ' dance tutorial beginner';
-  return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q);
-}
+// Reference videos live in js/videos.js — one file, so the app's only third-party
+// dependency stays auditable in a single place.

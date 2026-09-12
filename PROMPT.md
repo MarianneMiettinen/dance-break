@@ -82,29 +82,49 @@ network, works offline, and it shares a clock with the animation so the move is
 *Cost, named:* it is a groove, not a song. A file-backed player drops into the same
 interface later if you want real tracks.
 
-### 3. "Shows the moves" / "plays the video" — video is the wrong primitive here
+### 3. "Shows the moves" / "plays the video" — REVERSED on 2026-09-12
 
-Video cannot be counted, cannot be slowed without pitch artefacts, cannot be mirrored,
-and cannot tell you which beat you are on. What a beginner needs at 3pm beside a desk
-is *the count*.
+**Original decision:** no video; an SVG figure with counted cues, because video cannot be
+counted or mirrored.
 
-**Decision:** an SVG figure driven by per-beat pose data, mirrored so you copy what you
-see, interpolated against the audio clock, with the counted cue and the written steps
-beside it. Slows to 0.75x and 0.5x cleanly. It doubles as the statue art — a statue is
-the same figure frozen in that move's pose, which no video could give you.
+**MM's correction:** *"it needs to host real videos (15) because the instructions don't
+make any sense."* She is right, and the reasoning was backwards: written steps plus a
+stick figure are a fine *supplement* to seeing a person do the move, and a poor
+*substitute* for it. The count matters, but not before you know what the thing looks like.
 
-### 4. "Royalty-free or YouTube" — I will not ship a video ID I have not opened
+**What shipped instead:** both, as a toggle on the break screen.
 
-An unverified ID is a dead embed in a shipped product, and an embed is a third-party
-request on every break.
+| Mode | What it is | When it wins |
+|---|---|---|
+| **Watch it** (default) | A real tutorial, embedded | Learning the move at all |
+| **Count it out** | The animated figure + generated beat | Practising to a count; works offline |
 
-**Decision for v1:** no embeds. Each move carries **"See it danced"**, which opens a
-YouTube *search* URL in a new tab — deterministic, never dead, no third-party code on
-our page, fires only on click.
+The figure was not wasted — it still draws every statue in the cupboard, frozen in the
+move it was earned with.
 
-**Open, needs your go:** if you want real embedded reference video, I browse and verify
-all 15, check each licence, and put them behind `youtube-nocookie.com` in a panel that
-loads only on click. Stage 5 — it adds the only third-party request this product has.
+**Videos loop.** Eleven of the fifteen tutorials are shorter than three minutes, so
+watching once could never reach the break length. Looping is also simply what you want
+while practising a step.
+
+### 4. "Royalty-free or YouTube" — verified, not guessed
+
+All 15 were verified, three separate ways, because they answer three different questions:
+
+| Check | Question it answers |
+|---|---|
+| oEmbed returns HTTP 200 | Does the video exist and is it public? |
+| `YT.Player` fires `onReady`, not `onError` 101/150 | Does the owner permit embedding? |
+| Aspect ratio is landscape | Is it a vertical Short that would letterbox? |
+
+All 15 passed all three. `node tools/check-videos.mjs` re-runs the existence check on
+demand and exits non-zero if one has gone, because videos rot.
+
+Three channels cover multiple moves each — Howcast (3), Bon Sueno (2), Bustamovebook (3) —
+which gives the set some visual consistency.
+
+**Privacy cost, named:** the app previously made zero network requests. It now loads the
+YouTube IFrame API from youtube.com and the player from youtube-nocookie.com. That is a
+real change and the footer copy was rewritten to say so. Nothing loads until a break opens.
 
 ### 5. Rewards — built as a collection, not a streak
 
@@ -133,7 +153,7 @@ socks, without jumping**, and learnable in under 30 seconds.
 
 | Style | BPM | Moves |
 |---|---|---|
-| Hip-Hop Groove | 92 | Two-Step, Bounce, Heel-Toe Rock, Shoulder Roll, Cross Step |
+| Hip-Hop Groove | 92 | Two-Step, Bounce, Heel-Toe Rock, Shoulder Roll, Grapevine |
 | Latin Step | 96 | Side Basic, Merengue March, Back Rock, Cumbia Step, Basic Step |
 | Disco / Funk | 116 | The Point, The Hustle, Step-Touch Clap, Arm Roll, The Bump |
 

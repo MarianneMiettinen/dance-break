@@ -1,25 +1,28 @@
-import { STYLES, findMove, referenceSearchUrl } from './data.js';
+import { STYLES, findMove } from './data.js';
 import { Figure, poseAt } from './figure.js';
 import { DanceAudio } from './audio.js';
 import { Schedule, describe, newId, untilText, DAY_NAMES, DAY_LONG } from './schedule.js';
 import { rewardFor, rewardSVG, rewardTitle, previewNext, QUALIFY_MS, STATUE_EVERY } from './rewards.js';
+import { VIDEOS, watchUrl } from './videos.js';
+import { VideoPlayer, PLAYER_STATE } from './player.js';
 
 const $ = (id) => document.getElementById(id);
 const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const KEY = 'dancebreak.v2';
+const KEY = 'dancebreak.v3';
 
 // ---------------------------------------------------------------- state
 
 const defaults = {
-  entries: [],          // {id, time:'14:00', days:[1..]}
+  entries: [],
   remindersOn: false,
   breakSec: 180,
   styles: STYLES.map((s) => s.id),
   muted: false,
   rate: 1,
+  mode: 'video',        // 'video' | 'count'
   queues: {},
-  rewards: [],          // earned, newest last
-  qualified: 0,         // count of breaks that reached three minutes
+  rewards: [],
+  qualified: 0,
   firedSlots: [],
 };
 
@@ -51,7 +54,10 @@ function nextMove() {
   const styleId = on[Math.floor(Math.random() * on.length)];
   const style = STYLES.find((s) => s.id === styleId);
   let q = state.queues[styleId];
-  if (!Array.isArray(q) || q.length === 0) q = shuffle(style.moves.map((m) => m.id));
+  const valid = new Set(style.moves.map((m) => m.id));
+  if (!Array.isArray(q)) q = [];
+  q = q.filter((id) => valid.has(id));           // drop ids from an older build
+  if (q.length === 0) q = shuffle([...valid]);
   const id = q.shift();
   state.queues[styleId] = q;
   save();
@@ -67,26 +73,37 @@ const figure = new Figure($('figure'));
 let move = null;
 let raf = null;
 let lastBeat = -1;
-let hasPlayed = false;      // has this break ever been started
-let dancedMs = 0;           // time actually spent playing, this break
-let dancedSince = null;
+let videoFailed = false;
+
+const player = new VideoPlayer($('player-mount'), {
+  onStateChange: onVideoState,
+  onFail: () => {
+    videoFailed = true;
+    $('video-fallback').hidden = false;
+    setMode('count');
+  },
+});
+
+const isVideo = () => state.mode === 'video' && !videoFailed;
+const isPlaying = () => (isVideo() ? player.playing : audio.playing);
 
 // ---------------------------------------------------------------- break clock
 
 let breakEndsAt = null;
 let breakLeftMs = state.breakSec * 1000;
 let breakTicker = null;
+let dancedMs = 0;
+let dancedSince = null;
 
 const fmt = (ms) => {
   const s = Math.max(0, Math.round(ms / 1000));
   return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 };
 
-function dancedTotal() {
-  return dancedMs + (dancedSince ? Date.now() - dancedSince : 0);
-}
+const dancedTotal = () => dancedMs + (dancedSince ? Date.now() - dancedSince : 0);
 
 function startBreakClock() {
+  if (breakEndsAt) return;
   breakEndsAt = Date.now() + breakLeftMs;
   dancedSince = Date.now();
   clearInterval(breakTicker);
@@ -105,12 +122,26 @@ function pauseBreakClock() {
 
 function tickBreak() {
   const left = breakEndsAt ? Math.max(0, breakEndsAt - Date.now()) : breakLeftMs;
-  const total = state.breakSec * 1000;
-  $('timefill').style.transform = 'scaleX(' + (1 - left / total).toFixed(4) + ')';
+  $('timefill').style.transform = 'scaleX(' + (1 - left / (state.breakSec * 1000)).toFixed(4) + ')';
   $('timelabel').textContent = left > 0
     ? fmt(left) + ' left. Stop whenever you like.'
     : 'Time is up whenever you are.';
   if (left <= 0 && breakEndsAt) finishBreak(true);
+}
+
+// ---------------------------------------------------------------- video events
+
+function onVideoState(code) {
+  if (!isVideo()) return;
+  if (code === PLAYER_STATE.PLAYING) {
+    startBreakClock();
+    $('play').textContent = 'Pause';
+  } else if (code === PLAYER_STATE.PAUSED || code === PLAYER_STATE.ENDED) {
+    pauseBreakClock();
+    $('play').textContent = 'Play';
+    // "or the video ending" — the break can complete on its own.
+    if (code === PLAYER_STATE.ENDED && dancedTotal() >= QUALIFY_MS) finishBreak(true);
+  }
 }
 
 // ---------------------------------------------------------------- render loop
@@ -144,18 +175,27 @@ function stopPaint() { if (raf) cancelAnimationFrame(raf); raf = null; }
 // ---------------------------------------------------------------- screens
 
 const SCREENS = ['home', 'break', 'done', 'cupboard'];
-function show(which) {
-  for (const id of SCREENS) $('screen-' + id).hidden = id !== which;
+const show = (which) => SCREENS.forEach((id) => { $('screen-' + id).hidden = id !== which; });
+
+function setMode(mode) {
+  state.mode = mode;
+  save();
+  const video = mode === 'video' && !videoFailed;
+  $('pane-video').hidden = !video;
+  $('pane-count').hidden = video;
+  for (const b of $('mode-seg').children) {
+    b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
+  }
+  if (video) { stopPaint(); } else { stopPaint(); paint(); }
 }
 
-function loadMove(m) {
+async function loadMove(m) {
   move = m;
   lastBeat = -1;
   $('break-style').textContent = m.styleName;
   $('break-move').textContent = m.name;
   $('break-space').textContent = m.space;
   $('note').textContent = m.note;
-  $('reference').href = referenceSearchUrl(m);
 
   const counts = $('counts');
   counts.textContent = '';
@@ -178,15 +218,19 @@ function loadMove(m) {
   figure.setLabel(desc);
   $('figure-desc').textContent = desc;
   figure.apply(poseAt(m, 0, true));
+
+  const v = VIDEOS[m.id];
+  $('vid-label').textContent = v ? v.label : '';
+  $('vid-channel').textContent = v ? v.channel + ' · ' + v.len : '';
+  $('vid-link').href = v ? watchUrl(m.id) : '#';
+  if (v) await player.load(v.id);
 }
 
-function openBreak(m) {
-  loadMove(m || nextMove());
+async function openBreak(m) {
   breakLeftMs = state.breakSec * 1000;
   breakEndsAt = null;
   dancedMs = 0;
   dancedSince = null;
-  hasPlayed = false;
   audio.stop();
   $('play').textContent = 'Play';
   $('cue').textContent = 'Press play when you’re up.';
@@ -195,14 +239,21 @@ function openBreak(m) {
   tickBreak();
   show('break');
   document.title = 'Dance Break';
-  stopPaint();
-  paint();
+  setMode(state.mode);
   $('play').focus();
+  await loadMove(m || nextMove());
+  player.setMuted(state.muted);
+  player.setRate(state.rate);
 }
 
 async function setPlaying(on) {
+  if (isVideo()) {
+    // The clock follows the player's own state events, not this call — YouTube can
+    // refuse or buffer, and the timer must reflect what actually happened.
+    on ? player.play() : player.pause();
+    return;
+  }
   if (on) {
-    hasPlayed = true;
     await audio.start(move.styleId, move.bpm * state.rate);
     startBreakClock();
     $('play').textContent = 'Pause';
@@ -220,23 +271,22 @@ async function setPlaying(on) {
 
 // ---------------------------------------------------------------- ending a break
 
-function endBreakBookkeeping() {
+function finishBreak(ranOut) {
   if (dancedSince) { dancedMs += Date.now() - dancedSince; dancedSince = null; }
+  const danced = dancedMs;
+
   audio.fadeOut(700);
+  player.pause();
   clearInterval(breakTicker);
   breakTicker = null;
   breakEndsAt = null;
   stopPaint();
-}
 
-// ranOut: the clock reached zero, rather than the user pressing Continue.
-function finishBreak(ranOut) {
-  const danced = dancedTotal();
-  endBreakBookkeeping();
-
-  const earned = danced >= QUALIFY_MS;
+  // A 3-minute break and a 3-minute threshold are the same number, and timer slop
+  // means `danced` can land on 179.97s. Missing a medal by 30ms would be maddening,
+  // so the last three seconds count. This is rounding tolerance, not a lowered bar.
   let reward = null;
-  if (earned) {
+  if (danced >= QUALIFY_MS - 3000) {
     state.qualified += 1;
     reward = rewardFor(state.qualified, move);
     state.rewards.push(reward);
@@ -250,18 +300,14 @@ function showDone(reward, danced, ranOut) {
   const art = $('reward-art');
   if (reward) {
     art.innerHTML = rewardSVG(reward, findMove(reward.moveId), reward.kind === 'statue' ? 120 : 130);
-    art.hidden = false;
     $('done-title').textContent = reward.kind === 'statue'
-      ? 'A statue.'
-      : 'A ' + rewardTitle(reward).toLowerCase() + '.';
-    $('done-line').textContent = reward.kind === 'statue'
-      ? 'Number ' + reward.n + ', holding the ' + reward.moveName + '. It is in the cupboard.'
-      : 'Number ' + reward.n + ', for the ' + reward.moveName + '. It is in the cupboard.';
+      ? 'A statue.' : 'A ' + rewardTitle(reward).toLowerCase() + '.';
+    $('done-line').textContent = 'Number ' + reward.n + ', for the ' + reward.moveName
+      + '. It is in the cupboard.';
     $('done-cupboard').hidden = false;
   } else {
     art.innerHTML = '';
-    art.hidden = true;
-    $('done-title').textContent = ranOut ? 'That’s the three minutes.' : 'That’s it.';
+    $('done-title').textContent = ranOut ? 'That’s the time.' : 'That’s it.';
     $('done-line').textContent = danced > 0
       ? 'Nothing to log. Your legs know you did it.'
       : 'Nothing to log. It’s here when you want it.';
@@ -275,11 +321,9 @@ function showDone(reward, danced, ranOut) {
 
 const schedule = new Schedule((entry) => {
   const m = nextMove();
-  notify(m.name, entry);
+  notify(m.name);
   pendingMove = m;
   document.title = '● Dance break — ' + m.name;
-  // Stage 1 cannot open itself with no tab open; Stage 2's extension can. If the tab
-  // is in front, take it. If it is not, wait rather than ambush.
   if (!document.hidden && $('screen-break').hidden) { pendingMove = null; openBreak(m); }
   refreshHome();
 });
@@ -316,45 +360,34 @@ function renderEntries() {
   for (const e of state.entries) {
     const li = document.createElement('li');
     li.className = 'entry';
-
     const info = document.createElement('div');
-    info.innerHTML = '<span class="etime">' + e.time + '</span><span class="edays">'
-      + describe(e) + '</span>';
-
+    info.innerHTML = '<span class="etime">' + e.time + '</span><span class="edays">' + describe(e) + '</span>';
     const rm = document.createElement('button');
-    rm.className = 'btn-quiet btn-sm';
+    rm.className = 'btn-ghost btn-sm';
     rm.textContent = 'Remove';
     rm.setAttribute('aria-label', 'Remove the ' + e.time + ' break on ' + describe(e));
     rm.addEventListener('click', () => {
       state.entries = state.entries.filter((x) => x.id !== e.id);
       schedule.setEntries(state.entries);
-      save();
-      renderEntries();
-      refreshHome();
+      save(); renderEntries(); refreshHome();
     });
-
     li.append(info, rm);
     ul.appendChild(li);
   }
   $('entries-empty').hidden = state.entries.length > 0;
   $('clear-all').hidden = state.entries.length === 0;
 
-  // The advice changes with what is already set, rather than nagging at a fixed line.
-  const n = state.entries.length;
   const slots = state.entries.reduce((a, e) => a + e.days.length, 0);
-  $('advice').textContent = n === 0
+  $('advice').textContent = state.entries.length === 0
     ? 'Start with one break a week. Once that one sticks by itself, add another.'
-    : slots <= 2
-      ? 'One or two a week is a good place to stay for a while.'
-      : slots <= 5
-        ? 'That is a rhythm. Add more only if these are already happening.'
-        : 'That is a lot of breaks. Keeping the ones that stick beats adding more.';
+    : slots <= 2 ? 'One or two a week is a good place to stay for a while.'
+    : slots <= 5 ? 'That is a rhythm. Add more only if these are already happening.'
+    : 'That is a lot of breaks. Keeping the ones that stick beats adding more.';
 }
 
 function buildDayPicker() {
   const wrap = $('day-picker');
-  // Monday-first, which is what a week looks like here.
-  for (const d of [1, 2, 3, 4, 5, 6, 0]) {
+  for (const d of [1, 2, 3, 4, 5, 6, 0]) {     // Monday-first
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'day';
@@ -375,28 +408,24 @@ $('add-entry').addEventListener('click', () => {
   const time = $('new-time').value;
   if (!time) { $('add-error').textContent = 'Pick a time first.'; return; }
   if (!draftDays.length) { $('add-error').textContent = 'Pick at least one day.'; return; }
-  const dup = state.entries.find((e) => e.time === time
-    && e.days.slice().sort().join() === draftDays.slice().sort().join());
-  if (dup) { $('add-error').textContent = 'That one is already in the list.'; return; }
-
+  const key = (d) => d.slice().sort((a, b) => a - b).join();
+  if (state.entries.some((e) => e.time === time && key(e.days) === key(draftDays))) {
+    $('add-error').textContent = 'That one is already in the list.'; return;
+  }
   state.entries.push({ id: newId(), time, days: draftDays.slice() });
   state.entries.sort((a, b) => a.time.localeCompare(b.time));
   schedule.setEntries(state.entries);
   save();
-
   draftDays = [];
   for (const b of $('day-picker').children) b.setAttribute('aria-pressed', 'false');
   $('add-error').textContent = '';
-  renderEntries();
-  refreshHome();
+  renderEntries(); refreshHome();
 });
 
 $('clear-all').addEventListener('click', () => {
   state.entries = [];
   schedule.setEntries([]);
-  save();
-  renderEntries();
-  refreshHome();
+  save(); renderEntries(); refreshHome();
 });
 
 // ---------------------------------------------------------------- cupboard
@@ -404,27 +433,22 @@ $('clear-all').addEventListener('click', () => {
 function renderCupboard() {
   const grid = $('shelves');
   grid.textContent = '';
-  const items = state.rewards.slice().reverse();
-
-  for (const r of items) {
+  for (const r of state.rewards.slice().reverse()) {
     const cell = document.createElement('figure');
     cell.className = 'shelf-item ' + r.kind;
     cell.innerHTML = rewardSVG(r, findMove(r.moveId), r.kind === 'statue' ? 74 : 62);
     const cap = document.createElement('figcaption');
-    const d = new Date(r.at);
-    cap.innerHTML = '<b>' + rewardTitle(r) + '</b><br>' + r.moveName + '<br><span class="when">'
-      + d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + '</span>';
+    cap.innerHTML = '<b>' + rewardTitle(r) + '</b><br>' + r.moveName + '<br>'
+      + new Date(r.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
     cell.appendChild(cap);
     grid.appendChild(cell);
   }
-
   const medals = state.rewards.filter((r) => r.kind === 'medal').length;
   const statues = state.rewards.length - medals;
   $('cupboard-summary').textContent = state.rewards.length === 0
     ? 'Nothing in here yet. It fills three minutes at a time.'
     : medals + (medals === 1 ? ' medal' : ' medals')
       + (statues ? ' and ' + statues + (statues === 1 ? ' statue' : ' statues') : '') + '.';
-
   const nx = previewNext(state.qualified);
   const toStatue = STATUE_EVERY - (state.qualified % STATUE_EVERY);
   $('next-reward').textContent = 'Next one is a ' + nx.label.toLowerCase() + ' ' + nx.kind + '.'
@@ -443,15 +467,13 @@ function refreshHome() {
     $('next-status').textContent = 'A break is waiting: ' + pendingMove.name + '.';
   } else if (!on) {
     $('next-status').textContent = state.entries.length
-      ? 'Reminders are off. Your times are kept.'
-      : 'Reminders are off.';
+      ? 'Reminders are off. Your times are kept.' : 'Reminders are off.';
   } else if (!state.entries.length) {
     $('next-status').textContent = 'On, but no times set yet.';
   } else {
     const nx = schedule.nextOccurrence();
     $('next-status').textContent = nx
-      ? 'Next break ' + untilText(nx) + ', at ' + nx.toTimeString().slice(0, 5) + '.'
-      : 'On.';
+      ? 'Next break ' + untilText(nx) + ', at ' + nx.toTimeString().slice(0, 5) + '.' : 'On.';
   }
   $('cupboard-count').textContent = state.rewards.length;
   if (!pendingMove) document.title = 'Dance Break';
@@ -469,22 +491,28 @@ function segment(el, attr, current, onPick) {
 segment($('length-seg'), 'sec', state.breakSec, (v) => { state.breakSec = v; save(); });
 segment($('speed-seg'), 'rate', state.rate, (v) => {
   state.rate = v; save();
+  player.setRate(v);
   if (move) audio.setTempo(move.bpm * v);
 });
 
+for (const b of $('mode-seg').children) {
+  b.addEventListener('click', () => {
+    if (state.mode === b.dataset.mode) return;
+    // Switching engines mid-flight would leave two clocks running.
+    if (isPlaying()) setPlaying(false);
+    audio.stop();
+    player.pause();
+    $('play').textContent = 'Play';
+    setMode(b.dataset.mode);
+  });
+}
+
 $('toggle-reminders').addEventListener('click', async () => {
-  if (schedule.enabled) {
-    schedule.stop();
-    pendingMove = null;
-  } else {
-    await askNotify();
-    schedule.setEntries(state.entries);
-    schedule.start();
-  }
+  if (schedule.enabled) { schedule.stop(); pendingMove = null; }
+  else { await askNotify(); schedule.setEntries(state.entries); schedule.start(); }
   state.remindersOn = schedule.enabled;
   state.firedSlots = schedule.firedList();
-  save();
-  refreshHome();
+  save(); refreshHome();
 });
 
 for (const s of STYLES) {
@@ -496,7 +524,7 @@ for (const s of STYLES) {
   cb.addEventListener('change', () => {
     const set = new Set(state.styles);
     if (cb.checked) set.add(s.id); else set.delete(s.id);
-    if (set.size === 0) { cb.checked = true; return; }  // never leave nothing to show
+    if (set.size === 0) { cb.checked = true; return; }   // never leave nothing to show
     state.styles = [...set];
     save();
   });
@@ -508,18 +536,38 @@ for (const s of STYLES) {
 }
 
 $('dance-now').addEventListener('click', () => { pendingMove = null; openBreak(); });
-$('play').addEventListener('click', () => setPlaying(!audio.playing));
+$('play').addEventListener('click', () => setPlaying(!isPlaying()));
 $('continue-btn').addEventListener('click', () => finishBreak(false));
+// Loading a video takes a moment, and clicking through faster than it loads used to
+// leave the previous move's video on screen. The button says what it is doing and
+// refuses to stack requests.
+let swapping = false;
 $('another').addEventListener('click', async () => {
-  const wasPlaying = audio.playing;
-  audio.stop();
-  loadMove(nextMove());
-  if (wasPlaying) await setPlaying(true);
+  if (swapping) return;
+  swapping = true;
+  const btn = $('another');
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Finding one…';
+  try {
+    const wasPlaying = isPlaying();
+    audio.stop();
+    player.pause();
+    await loadMove(nextMove());
+    player.setMuted(state.muted);
+    player.setRate(state.rate);
+    if (wasPlaying) setPlaying(true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+    swapping = false;
+  }
 });
 $('mute').addEventListener('click', () => {
   state.muted = !state.muted;
   save();
   audio.setMuted(state.muted);
+  player.setMuted(state.muted);
   $('mute').textContent = state.muted ? 'Unmute' : 'Mute';
   $('mute').setAttribute('aria-pressed', String(state.muted));
 });
@@ -533,9 +581,9 @@ $('cupboard-back').addEventListener('click', () => { show('home'); refreshHome()
 document.addEventListener('keydown', (e) => {
   if (!$('screen-break').hidden) {
     if (e.key === 'Escape') { e.preventDefault(); finishBreak(false); }
-    if (e.key === ' ' && !['BUTTON', 'A', 'INPUT'].includes(e.target.tagName)) {
+    if (e.key === ' ' && !['BUTTON', 'A', 'INPUT', 'IFRAME'].includes(e.target.tagName)) {
       e.preventDefault();
-      setPlaying(!audio.playing);
+      setPlaying(!isPlaying());
     }
   } else if (!$('screen-cupboard').hidden && e.key === 'Escape') {
     show('home'); refreshHome(); $('open-cupboard').focus();
@@ -559,7 +607,7 @@ setInterval(() => {
 }, 15_000);
 
 window.__dance = {
-  STYLES, audio, figure, poseAt, state, schedule,
-  openBreak, finishBreak, renderCupboard, refreshHome, paintOnce,
-  rewardFor, rewardSVG, previewNext, save,
+  STYLES, audio, figure, poseAt, state, schedule, player, VIDEOS,
+  openBreak, finishBreak, renderCupboard, refreshHome, paintOnce, setMode,
+  rewardFor, rewardSVG, previewNext, save, isPlaying, nextMove,
 };
