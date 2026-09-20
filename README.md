@@ -1,8 +1,15 @@
 # Dance Break
 
+> An app that hosts real dance videos. It opens at the times you have set it to, to
+> help you remember to take a break from work and dance a little.
+
 A movement break beside your desk. At times you set, it offers one dance move, plays a
 real tutorial video for it, and puts a medal in your cupboard if you danced for three
 minutes.
+
+**One caveat on that description:** opening *itself* needs the browser extension, which
+is Stage 2 and not built yet. Today it can only come forward if a tab is already open —
+otherwise it fires a notification and waits. See `PROMPT.md`.
 
 - **15 moves**, 5 each across Hip-Hop Groove, Latin Step and Disco / Funk.
 - **15 verified tutorial videos**, one per move, embedded via YouTube's
