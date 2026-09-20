@@ -1,0 +1,4 @@
+# Dev-only. server.js exists so ES modules load over http:// locally; if it ships,
+# Vercel runs it as a function and serves its 404 instead of index.html.
+server.js
+tools/
